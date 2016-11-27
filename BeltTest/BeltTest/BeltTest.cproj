@@ -147,6 +147,9 @@
     <Compile Include="timers.c">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="usart_ATmega1284.h">
+      <SubType>compile</SubType>
+    </Compile>
   </ItemGroup>
   <Import Project="$(AVRSTUDIO_EXE_PATH)\\Vs\\Compiler.targets" />
 </Project>

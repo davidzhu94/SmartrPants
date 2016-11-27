@@ -28,7 +28,8 @@ main.d main.o: .././main.c \
  C:\Users\David\ Z\Desktop\FreeRTOS_Lab\FreeRTOS\Source\include/mpu_wrappers.h \
  C:\Users\David\ Z\Desktop\FreeRTOS_Lab\FreeRTOS\Source\include/task.h \
  C:\Users\David\ Z\Desktop\FreeRTOS_Lab\FreeRTOS\Source\include/list.h \
- C:\Users\David\ Z\Desktop\FreeRTOS_Lab\FreeRTOS\Source\include/croutine.h
+ C:\Users\David\ Z\Desktop\FreeRTOS_Lab\FreeRTOS\Source\include/croutine.h \
+ .././usart_ATmega1284.h
 
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\lib\gcc\avr\4.9.2\include\stdint.h:
 
@@ -89,3 +90,5 @@ C:\Users\David\ Z\Desktop\FreeRTOS_Lab\FreeRTOS\Source\include/task.h:
 C:\Users\David\ Z\Desktop\FreeRTOS_Lab\FreeRTOS\Source\include/list.h:
 
 C:\Users\David\ Z\Desktop\FreeRTOS_Lab\FreeRTOS\Source\include/croutine.h:
+
+.././usart_ATmega1284.h:

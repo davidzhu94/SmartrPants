@@ -14,7 +14,10 @@
 #include "FreeRTOS.h" 
 #include "task.h" 
 #include "croutine.h" 
-enum BeltState {INIT,Off, On} belt_state;
+#include "usart_ATmega1284.h"
+enum BeltState {INIT, Release, Connect} belt_state;
+
+unsigned char temp;
 
 void Belt_Init(){
 	belt_state = INIT;
@@ -25,25 +28,35 @@ void Belt_Tick(){
 	switch(belt_state){
 		case INIT:
 			break;
-		case Off:
-			PORTB = 0x00;
+		case Release:
+			//release magnet & lengthen belt
 			break;
-		case On:
-			PORTB = 0x01;
+		case Connect:
+			//charge magnets and wait 3 seconds, then tighten belt until load sensor reaches threshold 
 			break;
 	}
 	//Transitions
 	switch(belt_state){
 		case INIT:
-			belt_state = Off;
+			belt_state = Release;
 			break;
-		case Off:
-			if((~PIND & 0x01) == 0x01)
-				belt_state = On;
+		case Release:
+			if(USART_HasReceived(0))
+			{
+				temp = USART_HasReceived(0);
+				if(temp == 0)
+				belt_state = Connect;
+				USART_Flush(0);
+			}
 			break;
-		case On:
-			if((~PIND & 0x01) == 0x00)
-				belt_state = Off;
+		case Connect:
+			if(USART_HasReceived(0))
+			{
+				temp = USART_HasReceived(0);
+				if(temp == 1)
+				belt_state = Release;
+				USART_Flush(0);
+			}
 			break;
 		
 	}
@@ -68,6 +81,7 @@ int main(void)
 { 
    DDRB = 0xFF; PORTB=0x00;
    DDRD = 0x00; PORTD = 0xFF;
+   initUSART(0);
    //Start Tasks  
    StartSecPulse(1);
     //RunSchedular 
