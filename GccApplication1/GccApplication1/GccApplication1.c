@@ -14,10 +14,14 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "croutine.h"
+#include "usart_ATmega1284.h"
+
 enum MASTERState {INIT,OFF,ON} master_state;
-unsigned char counter = 0;
+	
 unsigned char toggle_right = 0x00;
 unsigned char toggle_left = 0x00;
+unsigned char signal = 0x00;
+
 void MASTER_Init(){
 	master_state = INIT;
 }
@@ -32,12 +36,7 @@ void MASTER_Tick(){
 			PORTD = 1;
 			break;
 		case ON:
-			counter++;
-			if(counter >= 20)
-			{
-				counter = 0;
-				PORTA &= 0xFD;
-			}
+			signal &= 0xFE;
 			if(~PINC&0x04)
 			{
 				toggle_right = ~toggle_right;
@@ -72,7 +71,7 @@ void MASTER_Tick(){
 		case OFF:
 			if(~PINC&0x10)
 			{
-				PORTA |= 0x03;
+				signal |= 0x01;
 				master_state = ON;
 			}
 			break;
@@ -92,6 +91,15 @@ void MasterSecTask()
 	for(;;)
 	{
 		MASTER_Tick();
+		if(USART_IsSendReady(0))
+		{
+			USART_Send(signal,0);
+			PORTA = 0x01;
+		}
+		else
+		{
+			PORTA = 0x80;
+		}
 		vTaskDelay(50);
 	}
 }
@@ -105,6 +113,7 @@ int main(void)
 {
 	DDRC = 0x00; PORTC = 0xFF;
 	DDRA = 0xFF; PORTA = 0x00;
+	initUSART(0);
 	//Start Tasks
 	StartSecPulse(1);
 	//RunSchedular
