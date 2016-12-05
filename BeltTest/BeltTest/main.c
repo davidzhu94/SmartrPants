@@ -1,91 +1,124 @@
-#include <stdint.h> 
-#include <stdlib.h> 
-#include <stdio.h> 
-#include <stdbool.h> 
-#include <string.h> 
-#include <math.h> 
-#include <avr/io.h> 
-#include <avr/interrupt.h> 
-#include <avr/eeprom.h> 
-#include <avr/portpins.h> 
-#include <avr/pgmspace.h> 
- 
-//FreeRTOS include files 
-#include "FreeRTOS.h" 
-#include "task.h" 
-#include "croutine.h" 
+#include "FreeRTOS.h"
+#include "task.h"
+#include "croutine.h"
 #include "usart_ATmega1284.h"
-enum BeltState {INIT, Release, Connect} belt_state;
+#include <util/delay.h>
+enum MotorState {INIT,Wait, Pull, Reverse} motor_state;
 
+unsigned short pullTimer = 0;
+unsigned short reverseTimer = 0;
 unsigned char temp;
+unsigned char password[] = {'1','3','3','7'};
+unsigned char password_count = 0;
 
-void Belt_Init(){
-	belt_state = INIT;
+void Motor_Init(){
+	motor_state = INIT;
 }
 
-void Belt_Tick(){
+void Motor_Tick(){
 	//Actions
-	switch(belt_state){
+	switch(motor_state){
 		case INIT:
 			break;
-		case Release:
-			//release magnet & lengthen belt
+		case Wait:
 			break;
-		case Connect:
-			//charge magnets and wait 3 seconds, then tighten belt until load sensor reaches threshold 
+		case Pull:
+			PORTA = 0x01;
+			_delay_ms(1);
+			PORTA = 0x00;
+			_delay_ms(1);
+			pullTimer++;
 			break;
+		case Reverse:
+			PORTA = 0x03;
+			_delay_ms(1);
+			PORTA = 0x02;
+			_delay_ms(1);
+			reverseTimer++;
+		break;
 	}
 	//Transitions
-	switch(belt_state){
+	switch(motor_state){
 		case INIT:
-			belt_state = Release;
-			break;
-		case Release:
-			if(USART_HasReceived(0))
+		motor_state = Wait;
+		break;
+		case Wait:
+		if(USART_HasReceived(0))
+		{
+			temp = USART_Receive(0);
+			if(temp == 0x01)
 			{
-				temp = USART_HasReceived(0);
-				if(temp == 0)
-				belt_state = Connect;
-				USART_Flush(0);
-			}
-			break;
-		case Connect:
-			if(USART_HasReceived(0))
-			{
+<<<<<<< HEAD
+				PORTB = 0x01;
 				temp = USART_HasReceived(0);
 				if(temp == 1)
-				belt_state = Release;
+					motor_state = Pull;
+				if(temp == 2)
+					motor_state = Reverse;
 				USART_Flush(0);
 			}
+			PORTB = 0x00;
 			break;
-		
+		case Pull:
+			if(pullTimer == 5000)
+=======
+				motor_state = Pull;
+				PORTB = 0x01;
+			}
+			if(temp == 0x02)
+>>>>>>> 48f61936c731ca7e02dd4272583d72e2cd11957d
+			{
+				motor_state = Reverse;
+				PORTB = 0x02;
+			}
+			USART_Flush(0);
+		}
+		break;
+		case Pull:
+		if(pullTimer == 1500)
+		{
+			pullTimer = 0;
+			PORTB = 0x00;
+			motor_state = Wait;
+		}
+		break;
+		case Reverse:
+		if(reverseTimer == 1500)
+		{
+			reverseTimer = 0;
+			PORTB = 0x00;
+			motor_state = Wait;
+		}
+		break;
 	}
 }
 
-void BeltSecTask()
+void MotorSecTask()
 {
-	Belt_Init();
-   for(;;) 
-   { 	
-	Belt_Tick();
-	vTaskDelay(100); 
-   } 
+	Motor_Init();
+	for(;;)
+	{
+		Motor_Tick();
+		vTaskDelay(1);
+	}
 }
 
 void StartSecPulse(unsigned portBASE_TYPE Priority)
 {
-	xTaskCreate(BeltSecTask, (signed portCHAR *)"BeltSecTask", configMINIMAL_STACK_SIZE, NULL, Priority, NULL );
-}	
- 
-int main(void) 
-{ 
-   DDRB = 0xFF; PORTB=0x00;
-   DDRD = 0x00; PORTD = 0xFF;
-   initUSART(0);
-   //Start Tasks  
-   StartSecPulse(1);
-    //RunSchedular 
-   vTaskStartScheduler(); 
- 
-   return 0; 
+	xTaskCreate(MotorSecTask, (signed portCHAR *)"MotorSecTask", configMINIMAL_STACK_SIZE, NULL, Priority, NULL );
+}
+
+int main(void)
+{
+	DDRA = 0xFF; PORTA=0x00;
+	DDRB = 0xFF; PORTB=0x00;
+	DDRD = 0x00; PORTD = 0xFF;
+	DDRA = 0xFF; PORTB = 0x00;
+	initUSART(0);
+	//Start Tasks
+	StartSecPulse(1);
+	//RunSchedular
+	vTaskStartScheduler();
+	
+	return 0;
 }
