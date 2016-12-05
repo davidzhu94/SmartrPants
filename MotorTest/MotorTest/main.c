@@ -48,6 +48,18 @@ void Motor_Tick(){
 			temp = USART_Receive(0);
 			if(temp == 0x01)
 			{
+				PORTB = 0x01;
+				temp = USART_HasReceived(0);
+				if(temp == 1)
+					motor_state = Pull;
+				if(temp == 2)
+					motor_state = Reverse;
+				USART_Flush(0);
+			}
+			PORTB = 0x00;
+			break;
+		case Pull:
+			if(pullTimer == 5000)
 				motor_state = Pull;
 				PORTB = 0x01;
 			}
@@ -98,6 +110,7 @@ int main(void)
 	DDRA = 0xFF; PORTA=0x00;
 	DDRB = 0xFF; PORTB=0x00;
 	DDRD = 0x00; PORTD = 0xFF;
+	DDRA = 0xFF; PORTB = 0x00;
 	initUSART(0);
 	//Start Tasks
 	StartSecPulse(1);
