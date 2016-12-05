@@ -1,117 +1,188 @@
-#include <stdint.h> 
-#include <stdlib.h> 
-#include <stdio.h> 
-#include <stdbool.h> 
-#include <string.h> 
-#include <math.h> 
-#include <avr/io.h> 
-#include <avr/interrupt.h> 
-#include <avr/eeprom.h> 
-#include <avr/portpins.h> 
-#include <avr/pgmspace.h> 
- 
-//FreeRTOS include files 
-#include "FreeRTOS.h" 
-#include "task.h" 
-#include "croutine.h" 
-enum LEDState {INIT,L0,L1,L2,L3,L4,L5,L6,L7} led_state;
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdbool.h>
+#include <string.h>
+#include <math.h>
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <avr/eeprom.h>
+#include <avr/portpins.h>
+#include <avr/pgmspace.h>
 
-void LEDS_Init(){
-	led_state = INIT;
+//FreeRTOS include files
+#include "FreeRTOS.h"
+#include "task.h"
+#include "croutine.h"
+#include "usart_ATmega1284.h"
+#include "keypad.h"
+#include "lcd.h"
+
+enum MASTERState {INIT,OFF,ON} master_state;
+
+unsigned char toggle_right = 0x00;
+unsigned char toggle_left = 0x00;
+unsigned char toggle_magnet = 0x00;
+unsigned char signal = 0x00;
+unsigned char password[] = {'1','3','3','7'};
+unsigned char password_count = 0;
+unsigned char inputed_password[4] = {};
+unsigned char password_correct_status = 0xFF;
+unsigned char key;
+unsigned char attempts = 0;
+unsigned char steps = '0';
+unsigned char timer = 0;
+
+void MASTER_Init(){
+	master_state = INIT;
 }
 
-void LEDS_Tick(){
+void MASTER_Tick(){
 	//Actions
-	switch(led_state){
+	switch(master_state){
 		case INIT:
-		PORTD = 0;
-		break;
-		case L0:
-		PORTD = 1;
-		break;
-		case L1:
-		PORTD = 2;
-		break;
-		case L2:
-		PORTD = 4;
-		break;
-		case L3:
-		PORTD = 8;
-		break;
-		case L4:
-		PORTD = 16;
-		break;
-		case L5:
-		PORTD = 32;
-		break;
-		case L6:
-		PORTD = 64;
-		break;
-		case L7:
-		PORTD = 128;
-		break;
-		default:
-		PORTD = 0;
-		break;
+			break;
+		case OFF:
+			signal = 0x00;
+			if(password_count >= 4)
+			{
+				attempts++;
+				password_count = 0;
+				password_correct_status = 0xFF;
+				LCD_DisplayString(1,"Incorrect! Try again: ");
+			}
+			key = GetKeypadKey();
+			if(key != '\0')
+			{
+				if(attempts == 0)
+				{
+					LCD_DisplayString(1,"Enter Password:  ");
+				}
+				else
+				{
+					LCD_DisplayString(1,"Incorrect! Try again: ");
+				}
+				inputed_password[password_count] = key;
+				if(key != password[password_count])
+				{
+					password_correct_status = 0x00;
+				}
+				password_count++;
+				PORTB = key;
+				for(int i = 0; i < password_count; i++)
+				{
+					LCD_WriteData(inputed_password[i]);
+				}
+			}
+			break;
+		case ON:
+			signal &= 0xFE;
+			if(~PIND&0x04)
+			{
+				steps+=2;
+				LCD_DisplayString(1,"PEDOMETER: ");
+				LCD_WriteData(steps);
+			}
+			if(~PINB&0x04)
+			{
+				toggle_magnet = ~toggle_magnet;
+			}
+			if(~PINB&0x20)
+			{
+				toggle_right = ~toggle_right;
+			}
+			if(~PINB&0x10)
+			{
+				toggle_left = ~toggle_left;
+			}
+			if(toggle_right == 0xFF)
+			{
+				PORTD |= 0x10;
+			}
+			else if(toggle_right == 0x00)
+			{
+				PORTD &= 0xEF;
+			}
+			if(toggle_left)
+			{
+				PORTD |= 0x20;
+			}
+			else
+			{
+				PORTD &= 0xDF;
+			}
+			if(toggle_magnet)
+			{
+				signal |= 0x02;
+			}
+			else
+			{
+				signal &= 0xFD;
+			}
+			break;
 	}
 	//Transitions
-	switch(led_state){
+	switch(master_state){
 		case INIT:
-			led_state = L0;
-		break;
-		case L0:
-			led_state = L1;
-		break;
-		case L1:
-			led_state = L2;
-		break;
-		case L2:
-			led_state = L3;
-		break;
-		case L3:
-			led_state = L4;
-		break;
-		case L4:
-			led_state = L5;
-		break;
-		case L5:
-			led_state = L6;
-		break;
-		case L6:
-			led_state = L7;
-		break;
-		case L7:
-			led_state = L0;
-		break;
-		default:
-			led_state = INIT;
-		break;
+			master_state = OFF;
+			break;
+		case OFF:
+			if(password_correct_status == 0xFF && password_count == 4)
+			{
+				signal |= 0x01;
+				master_state = ON;
+				LCD_DisplayString(1,"PEDOMETER: ");
+				LCD_WriteData(steps);
+			}
+			break;
+		case ON:
+			if(~PINB&0x01 && ~PINB&0x02)
+			{
+				PORTD = 0x00;
+				LCD_DisplayString(1,"Enter Password: ");
+				master_state = OFF;
+				attempts = 0;
+				password_count = 0;
+				signal = 0xFF;
+				password_correct_status = 0xFF;
+				toggle_magnet = 0x00;
+				toggle_left = 0x00;
+				toggle_right = 0x00;
+			}
+			break;
 	}
 }
 
-void LedSecTask()
+void MasterSecTask()
 {
-	LEDS_Init();
-   for(;;) 
-   { 	
-	LEDS_Tick();
-	vTaskDelay(100); 
-   } 
+	MASTER_Init();
+	for(;;)
+	{
+		MASTER_Tick();
+		if(USART_IsSendReady(0))
+		USART_Send(signal,0);
+		vTaskDelay(50);
+	}
 }
 
 void StartSecPulse(unsigned portBASE_TYPE Priority)
 {
-	xTaskCreate(LedSecTask, (signed portCHAR *)"LedSecTask", configMINIMAL_STACK_SIZE, NULL, Priority, NULL );
-}	
- 
-int main(void) 
-{ 
-   DDRA = 0x00; PORTA=0xFF;
-   DDRD = 0xFF;
-   //Start Tasks  
-   StartSecPulse(1);
-    //RunSchedular 
-   vTaskStartScheduler(); 
- 
-   return 0; 
+	xTaskCreate(MasterSecTask, (signed portCHAR *)"MasterSecTask", configMINIMAL_STACK_SIZE, NULL, Priority, NULL );
+}
+
+int main(void)
+{
+	DDRA = 0xFF; PORTA = 0x00;
+	DDRB = 0x00; PORTB = 0xFF;
+	DDRC = 0xF0; PORTC = 0x0F;
+	DDRD = 0xF0; PORTD = 0x0F;
+	initUSART(0);
+	LCD_init();
+	LCD_DisplayString(1,"Enter Password: ");
+	//Start Tasks
+	StartSecPulse(1);
+	//RunSchedular
+	vTaskStartScheduler();
+	
+	return 0;
 }
