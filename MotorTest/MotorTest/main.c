@@ -8,7 +8,6 @@ enum MotorState {INIT,Wait, Pull, Reverse} motor_state;
 unsigned short pullTimer = 0;
 unsigned short reverseTimer = 0;
 unsigned char temp;
-unsigned char password[] = {'1','3','3','7'};
 unsigned char password_count = 0;
 
 void Motor_Init(){
@@ -24,69 +23,67 @@ void Motor_Tick(){
 			break;
 		case Pull:
 			PORTA = 0x01;
+			PORTB = 0x03;
 			_delay_ms(1);
 			PORTA = 0x00;
+			PORTB = 0x02;
 			_delay_ms(1);
 			pullTimer++;
 			break;
 		case Reverse:
 			PORTA = 0x03;
+			PORTB = 0x01;
 			_delay_ms(1);
 			PORTA = 0x02;
+			PORTB = 0x00;
 			_delay_ms(1);
 			reverseTimer++;
-		break;
+			break;
 	}
 	//Transitions
 	switch(motor_state){
 		case INIT:
-		motor_state = Wait;
-		break;
+			motor_state = Wait;
+			break;
 		case Wait:
-		if(USART_HasReceived(0))
-		{
-			temp = USART_Receive(0);
-			if(temp == 0x01)
+			if(USART_HasReceived(0))
 			{
-				PORTB = 0x01;
-				temp = USART_HasReceived(0);
-				if(temp == 1)
+				temp = USART_Receive(0);
+				if(temp == 0xFF)//Roll pants down and disengage magnet
+				{
 					motor_state = Pull;
-				if(temp == 2)
-					motor_state = Reverse;
+					PORTC = 0x00;
+				}
+				else
+				{
+					if((temp & 0x01) == 0x01)//Unroll pants
+					{
+						motor_state = Reverse;
+					}
+					if((temp & 0x02) == 0x02)//Enable magnet 
+						PORTC = 0x01;
+					else
+						PORTC = 0x00;
+				}
 				USART_Flush(0);
 			}
-			PORTB = 0x00;
 			break;
 		case Pull:
-			if(pullTimer == 5000)
-				motor_state = Pull;
-				PORTB = 0x01;
-			}
-			if(temp == 0x02)
+			if(pullTimer == 1500)
 			{
-				motor_state = Reverse;
-				PORTB = 0x02;
+				pullTimer = 0;
+				PORTB = 0x00;
+				motor_state = Wait;
 			}
-			USART_Flush(0);
-		}
-		break;
-		case Pull:
-		if(pullTimer == 1500)
-		{
-			pullTimer = 0;
-			PORTB = 0x00;
-			motor_state = Wait;
-		}
-		break;
+			break;
 		case Reverse:
-		if(reverseTimer == 1500)
-		{
-			reverseTimer = 0;
-			PORTB = 0x00;
-			motor_state = Wait;
-		}
-		break;
+			if(reverseTimer == 1500)
+			{
+				reverseTimer = 0;
+				PORTB = 0x00;
+				motor_state = Wait;
+			}
+			break;
 	}
 }
 
@@ -109,8 +106,9 @@ int main(void)
 {
 	DDRA = 0xFF; PORTA=0x00;
 	DDRB = 0xFF; PORTB=0x00;
+	DDRC = 0xFF; PORTC= 0x00;
 	DDRD = 0x00; PORTD = 0xFF;
-	DDRA = 0xFF; PORTB = 0x00;
+	
 	initUSART(0);
 	//Start Tasks
 	StartSecPulse(1);
