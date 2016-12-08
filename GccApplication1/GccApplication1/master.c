@@ -30,8 +30,12 @@ unsigned char inputed_password[4] = {};
 unsigned char password_correct_status = 0xFF;
 unsigned char key;
 unsigned char attempts = 0;
-unsigned char steps = '0';
+unsigned char steps = 0;
+unsigned char steps_1_place = '0';
+unsigned char steps_10_place = '0';
+unsigned char steps_100_place = '0';
 unsigned char timer = 0;
+unsigned char steps_temp;
 
 void MASTER_Init(){
 	master_state = INIT;
@@ -80,8 +84,19 @@ void MASTER_Tick(){
 			if(~PIND&0x04)
 			{
 				steps+=2;
+				steps_temp = steps;
+				steps_1_place = steps%10;
+				steps_temp /= 10;
+				steps_10_place = steps_temp%10;
+				steps_temp /= 10;
+				steps_100_place = steps_temp%10;
+				steps_1_place += '0';
+				steps_10_place += '0';
+				steps_100_place += '0';
 				LCD_DisplayString(1,"PEDOMETER: ");
-				LCD_WriteData(steps);
+				LCD_WriteData(steps_100_place);
+				LCD_WriteData(steps_10_place);
+				LCD_WriteData(steps_1_place);
 			}
 			if(~PINB&0x04)
 			{
@@ -118,6 +133,10 @@ void MASTER_Tick(){
 			else
 			{
 				signal &= 0xFD;
+			}
+			if(~PINB&0x40)
+			{
+				PORTD ^= 0x30;
 			}
 			break;
 	}
@@ -161,7 +180,7 @@ void MasterSecTask()
 		MASTER_Tick();
 		if(USART_IsSendReady(0))
 		USART_Send(signal,0);
-		vTaskDelay(50);
+		vTaskDelay(30);
 	}
 }
 
